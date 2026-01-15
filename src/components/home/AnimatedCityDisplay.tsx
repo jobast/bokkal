@@ -29,6 +29,9 @@ export function AnimatedCityDisplay({ cities, compact = false }: AnimatedCityDis
   }, [cities.length]);
 
   const currentCity = cities[currentIndex];
+  const isOrange = currentIndex % 2 === 0;
+  const pinColor = isOrange ? 'text-primary' : 'text-secondary';
+  const textColor = isOrange ? 'text-primary' : 'text-secondary';
 
   if (compact) {
     return (
@@ -37,10 +40,10 @@ export function AnimatedCityDisplay({ cities, compact = false }: AnimatedCityDis
           href={`/events?city=${currentCity.key}`}
           className="group relative"
         >
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-primary" />
+          <div className="flex flex-col items-center">
+            <MapPin className={`h-4 w-4 transition-colors duration-300 ${pinColor}`} />
             <span
-              className={`text-sm font-medium text-primary transition-all duration-300 ${
+              className={`text-sm font-medium transition-all duration-300 ${textColor} ${
                 isVisible
                   ? 'opacity-100 translate-y-0'
                   : 'opacity-0 translate-y-2'
@@ -56,7 +59,9 @@ export function AnimatedCityDisplay({ cities, compact = false }: AnimatedCityDis
             <div
               key={index}
               className={`w-1 h-1 rounded-full transition-colors duration-300 ${
-                index === currentIndex ? 'bg-primary' : 'bg-muted-foreground/30'
+                index === currentIndex
+                  ? (index % 2 === 0 ? 'bg-primary' : 'bg-secondary')
+                  : 'bg-muted-foreground/30'
               }`}
             />
           ))}
@@ -73,10 +78,10 @@ export function AnimatedCityDisplay({ cities, compact = false }: AnimatedCityDis
         href={`/events?city=${currentCity.key}`}
         className="group relative"
       >
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-primary" />
+        <div className="flex flex-col items-center">
+          <MapPin className={`h-6 w-6 mb-1 transition-colors duration-300 ${pinColor}`} />
           <span
-            className={`text-2xl font-bold text-primary transition-all duration-300 ${
+            className={`text-2xl font-bold transition-all duration-300 ${textColor} ${
               isVisible
                 ? 'opacity-100 translate-y-0'
                 : 'opacity-0 translate-y-2'
@@ -85,7 +90,7 @@ export function AnimatedCityDisplay({ cities, compact = false }: AnimatedCityDis
             {currentCity.label}
           </span>
         </div>
-        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
+        <span className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-300 group-hover:w-full ${isOrange ? 'bg-primary' : 'bg-secondary'}`} />
       </Link>
 
       {/* Dots indicator */}
@@ -94,7 +99,9 @@ export function AnimatedCityDisplay({ cities, compact = false }: AnimatedCityDis
           <div
             key={index}
             className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
-              index === currentIndex ? 'bg-primary' : 'bg-muted-foreground/30'
+              index === currentIndex
+                ? (index % 2 === 0 ? 'bg-primary' : 'bg-secondary')
+                : 'bg-muted-foreground/30'
             }`}
           />
         ))}
