@@ -28,6 +28,7 @@ import { fr, enUS } from 'date-fns/locale';
 import type { Event, EventType, CategoryId } from '@/types';
 import { EVENT_TYPE_COLORS, getCategoryById } from '@/lib/constants';
 import { formatPrice, isFreeEvent } from '@/lib/utils';
+import { useImageOrientation } from '@/hooks/useImageOrientation';
 
 // Legacy type icons
 const typeIcons: Record<EventType, React.ComponentType<{ className?: string }>> = {
@@ -67,6 +68,9 @@ export function EventCard({ event }: EventCardProps) {
 
   const dateLocale = locale === 'fr' ? fr : enUS;
 
+  // Detect image orientation for adaptive height
+  const imageOrientation = useImageOrientation(event.image_url);
+
   // Use new category system if available, otherwise fall back to legacy
   const hasNewCategory = event.category && event.category in categoryIcons;
   const category = hasNewCategory ? getCategoryById(event.category!) : null;
@@ -88,11 +92,18 @@ export function EventCard({ event }: EventCardProps) {
       ? event.title_wo
       : event.title;
 
+  // Adaptive image height based on orientation
+  // Portrait: 288px, Square: 224px, Landscape/Default: 192px
+  const imageHeightClass =
+    imageOrientation === 'portrait' ? 'h-72' :
+    imageOrientation === 'square' ? 'h-56' :
+    'h-48';
+
   return (
     <Link href={`/events/${event.id}`}>
       <Card className="card-hover group overflow-hidden cursor-pointer h-full border">
-        {/* Image */}
-        <div className="relative h-48 placeholder-pattern">
+        {/* Image - Adaptive height based on orientation */}
+        <div className={`relative ${imageHeightClass} placeholder-pattern transition-all duration-300`}>
           {event.image_url ? (
             <img
               src={event.image_url}

@@ -156,14 +156,17 @@ export default function HomePage({
               </Link>
             </Button>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-stagger">
-            {mockEvents.map((event) => {
+          <div className="columns-1 md:columns-2 lg:columns-3 gap-6">
+            {mockEvents.map((event, index) => {
               const categoryConfig = EVENT_CATEGORIES.find(c => c.id === event.category);
               const Icon = categoryConfig ? (categoryIcons[categoryConfig.icon] || CalendarDays) : CalendarDays;
               const color = categoryConfig?.color || '#FF6B35';
+              // Vary heights for visual interest (simulating different image orientations)
+              const heightClass = index === 0 ? 'h-72' : index === 1 ? 'h-48' : 'h-56';
               return (
-                <Card key={event.id} className="card-hover overflow-hidden cursor-pointer border group">
-                  <div className="relative h-48 placeholder-pattern">
+                <div key={event.id} className="break-inside-avoid mb-6">
+                <Card className="card-hover overflow-hidden cursor-pointer border group">
+                  <div className={`relative ${heightClass} placeholder-pattern`}>
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Icon className="h-16 w-16 text-muted-foreground/20 group-hover:scale-110 transition-transform" />
                     </div>
@@ -198,6 +201,7 @@ export default function HomePage({
                     </div>
                   </CardContent>
                 </Card>
+                </div>
               );
             })}
           </div>

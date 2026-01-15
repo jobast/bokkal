@@ -43,9 +43,11 @@ async function EventsList() {
   }
 
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="columns-1 md:columns-2 lg:columns-3 gap-6">
       {events.map((event) => (
-        <EventCard key={event.id} event={event} />
+        <div key={event.id} className="break-inside-avoid mb-6">
+          <EventCard event={event} />
+        </div>
       ))}
     </div>
   );
@@ -84,9 +86,9 @@ export default async function EventsPage({
       </div>
 
       {/* Events list */}
-      <Suspense fallback={<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-64 bg-muted animate-pulse rounded-lg" />
+      <Suspense fallback={<div className="columns-1 md:columns-2 lg:columns-3 gap-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className={`break-inside-avoid mb-6 bg-muted animate-pulse rounded-lg ${i % 3 === 0 ? 'h-80' : i % 2 === 0 ? 'h-72' : 'h-64'}`} />
         ))}
       </div>}>
         <EventsList />
