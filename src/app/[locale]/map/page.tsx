@@ -83,22 +83,46 @@ function EventListItem({ event, locale }: { event: Event; locale: string }) {
   );
 }
 
-function MapLegend() {
+function MapLegend({
+  activeCategory,
+  onCategoryClick,
+}: {
+  activeCategory: string | null;
+  onCategoryClick: (categoryId: string | null) => void;
+}) {
   const tCategories = useTranslations('events.categories');
 
   return (
     <div className="hidden lg:block absolute bottom-4 left-4 z-[1000]">
       <div className="bg-background/95 backdrop-blur rounded-lg px-3 py-2 shadow-lg">
         <div className="flex items-center gap-3">
-          {EVENT_CATEGORIES.map((cat) => (
-            <div key={cat.id} className="flex items-center gap-1">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: cat.color }}
-              />
-              <span className="text-xs">{tCategories(cat.id)}</span>
-            </div>
-          ))}
+          {EVENT_CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            const isInactive = activeCategory && activeCategory !== cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => onCategoryClick(isActive ? null : cat.id)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all ${
+                  isActive ? 'bg-primary/10 ring-1 ring-primary' : ''
+                } ${isInactive ? 'opacity-40' : ''} hover:bg-muted`}
+              >
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: cat.color }}
+                />
+                <span className="text-xs">{tCategories(cat.id)}</span>
+              </button>
+            );
+          })}
+          {activeCategory && (
+            <button
+              onClick={() => onCategoryClick(null)}
+              className="text-xs text-muted-foreground hover:text-foreground ml-2"
+            >
+              ✕ Réinitialiser
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -107,10 +131,9 @@ function MapLegend() {
 
 export default function MapPage() {
   const locale = useLocale();
-  const t = useTranslations('map');
-
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   // Fetch events from Supabase
   useEffect(() => {
@@ -136,10 +159,18 @@ export default function MapPage() {
     fetchEvents();
   }, []);
 
-  // Filter events with coordinates
+  // Filter events with coordinates and by category
   const eventsWithCoordinates = useMemo(
     () => events.filter((event) => event.location_lat && event.location_lng),
     [events]
+  );
+
+  // Filter by active category
+  const filteredEvents = useMemo(
+    () => activeCategory
+      ? eventsWithCoordinates.filter((event) => event.category === activeCategory)
+      : eventsWithCoordinates,
+    [eventsWithCoordinates, activeCategory]
   );
 
   if (loading) {
@@ -154,15 +185,7 @@ export default function MapPage() {
     <div className="relative h-[calc(100vh-4rem)]">
       {/* Map */}
       <div className="absolute inset-0">
-        <EventMap events={eventsWithCoordinates} />
-      </div>
-
-      {/* Header overlay - desktop only */}
-      <div className="hidden lg:block absolute top-4 left-4 z-[1000] pointer-events-auto">
-        <div className="bg-background/95 backdrop-blur rounded-lg px-4 py-2 shadow-lg">
-          <h1 className="text-xl font-bold">{t('title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
-        </div>
+        <EventMap events={filteredEvents} />
       </div>
 
       {/* Desktop sidebar */}
@@ -171,16 +194,16 @@ export default function MapPage() {
           <CardContent className="p-4 h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">
-                Événements ({eventsWithCoordinates.length})
+                Événements ({filteredEvents.length})
               </h2>
             </div>
-            {eventsWithCoordinates.length === 0 ? (
+            {filteredEvents.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                Aucun événement avec localisation
+                {activeCategory ? 'Aucun événement dans cette catégorie' : 'Aucun événement avec localisation'}
               </p>
             ) : (
               <div className="flex-1 overflow-y-auto space-y-3">
-                {eventsWithCoordinates.map((event) => (
+                {filteredEvents.map((event) => (
                   <EventListItem key={event.id} event={event} locale={locale} />
                 ))}
               </div>
@@ -189,8 +212,11 @@ export default function MapPage() {
         </Card>
       </div>
 
-      {/* Legend - desktop only */}
-      <MapLegend />
+      {/* Interactive Legend - desktop only */}
+      <MapLegend
+        activeCategory={activeCategory}
+        onCategoryClick={setActiveCategory}
+      />
     </div>
   );
 }

@@ -26,6 +26,7 @@ function getEventColor(event: Event): string {
 // Store map instance outside React to survive Strict Mode
 let globalMapInstance: any = null;
 let globalMapContainerId: string | null = null;
+let globalMarkersLayer: any = null;
 
 export function EventMap({ events, onEventClick }: EventMapProps) {
   const locale = useLocale();
@@ -177,56 +178,8 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map);
 
-      // Add markers
-      events.forEach((event) => {
-        if (event.location_lat && event.location_lng) {
-          const markerColor = getEventColor(event);
-          const icon = leafletRef.current.divIcon({
-            className: 'custom-marker',
-            html: `
-              <div style="
-                width: 36px;
-                height: 36px;
-                background-color: ${markerColor};
-                border-radius: 50% 50% 50% 0;
-                transform: rotate(-45deg);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border: 3px solid white;
-                box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-                cursor: pointer;
-              ">
-                <div style="transform: rotate(45deg); color: white; font-size: 14px; font-weight: bold;">
-                  ●
-                </div>
-              </div>
-            `,
-            iconSize: [36, 36],
-            iconAnchor: [18, 36],
-            popupAnchor: [0, -36],
-          });
-
-          const marker = leafletRef.current.marker([event.location_lat, event.location_lng], { icon });
-
-          marker.bindPopup(createPopupContent(event), {
-            maxWidth: 280,
-            className: 'custom-popup',
-          });
-
-          marker.addTo(map);
-
-          // Click handler with stopPropagation to prevent event bubbling
-          marker.on('click', (e: any) => {
-            if (e.originalEvent) {
-              e.originalEvent.stopPropagation();
-            }
-            if (onEventClickRef.current) {
-              onEventClickRef.current(event);
-            }
-          });
-        }
-      });
+      // Create markers layer group
+      globalMarkersLayer = leafletRef.current.layerGroup().addTo(map);
 
       // Hide loading overlay using DOM manipulation (no state change = no re-render)
       const overlay = containerRef.current?.parentElement?.querySelector('.map-loading-overlay');
@@ -242,6 +195,65 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
       // Don't cleanup the map here - it will cause flashing in Strict Mode
       // The map will be cleaned up when a new one is created or on page navigation
     };
+  }, []);
+
+  // Update markers when events change
+  useEffect(() => {
+    if (!globalMapInstance || !globalMarkersLayer || !leafletRef.current) return;
+
+    // Clear existing markers
+    globalMarkersLayer.clearLayers();
+
+    // Add new markers
+    events.forEach((event) => {
+      if (event.location_lat && event.location_lng) {
+        const markerColor = getEventColor(event);
+        const icon = leafletRef.current.divIcon({
+          className: 'custom-marker',
+          html: `
+            <div style="
+              width: 36px;
+              height: 36px;
+              background-color: ${markerColor};
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 3px solid white;
+              box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+              cursor: pointer;
+            ">
+              <div style="transform: rotate(45deg); color: white; font-size: 14px; font-weight: bold;">
+                ●
+              </div>
+            </div>
+          `,
+          iconSize: [36, 36],
+          iconAnchor: [18, 36],
+          popupAnchor: [0, -36],
+        });
+
+        const marker = leafletRef.current.marker([event.location_lat, event.location_lng], { icon });
+
+        marker.bindPopup(createPopupContent(event), {
+          maxWidth: 280,
+          className: 'custom-popup',
+        });
+
+        marker.addTo(globalMarkersLayer);
+
+        // Click handler with stopPropagation to prevent event bubbling
+        marker.on('click', (e: any) => {
+          if (e.originalEvent) {
+            e.originalEvent.stopPropagation();
+          }
+          if (onEventClickRef.current) {
+            onEventClickRef.current(event);
+          }
+        });
+      }
+    });
   }, [events, createPopupContent]);
 
   // Cleanup only on actual unmount (navigation away)
@@ -256,6 +268,7 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
         }
         globalMapInstance = null;
         globalMapContainerId = null;
+        globalMarkersLayer = null;
       }
     };
   }, []);
