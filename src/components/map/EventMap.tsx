@@ -44,6 +44,8 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
   const localeRef = useRef(locale);
   const containerRef = useRef<HTMLDivElement>(null);
   const leafletRef = useRef<any>(null);
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
 
   // Update refs on each render
   onEventClickRef.current = onEventClick;
@@ -53,67 +55,123 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
   dateLocaleRef.current = dateLocale;
   localeRef.current = locale;
 
-  // Memoized function to create popup content
-  const createPopupContent = useCallback((event: Event) => {
-    const currentLocale = localeRef.current;
-    const currentTTypes = tTypesRef.current;
-    const currentTCategories = tCategoriesRef.current;
-    const currentTCities = tCitiesRef.current;
-    const currentDateLocale = dateLocaleRef.current;
+  // Helper function to add markers to the map
+  const addMarkersToMap = useCallback((eventsToAdd: Event[], L: any) => {
+    if (!globalMarkersLayer || !L) return;
 
-    const title =
-      currentLocale === 'en' && event.title_en
-        ? event.title_en
-        : currentLocale === 'wo' && event.title_wo
-        ? event.title_wo
-        : event.title;
+    // Clear existing markers
+    globalMarkersLayer.clearLayers();
 
-    // Use new category system if available, fallback to legacy event_type
-    const color = getEventColor(event);
-    const categoryLabel = event.category
-      ? currentTCategories(event.category)
-      : currentTTypes(event.event_type);
+    // Add new markers
+    eventsToAdd.forEach((event) => {
+      if (event.location_lat && event.location_lng) {
+        const markerColor = getEventColor(event);
+        const icon = L.divIcon({
+          className: 'custom-marker',
+          html: `
+            <div style="
+              width: 36px;
+              height: 36px;
+              background-color: ${markerColor};
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 3px solid white;
+              box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+              cursor: pointer;
+            ">
+              <div style="transform: rotate(45deg); color: white; font-size: 14px; font-weight: bold;">
+                ●
+              </div>
+            </div>
+          `,
+          iconSize: [36, 36],
+          iconAnchor: [18, 36],
+          popupAnchor: [0, -36],
+        });
 
-    return `
-      <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
-        <div style="
-          display: inline-block;
-          padding: 4px 10px;
-          font-size: 11px;
-          font-weight: 500;
-          background-color: ${color};
-          color: white;
-          border-radius: 6px;
-          margin-bottom: 10px;
-        ">${categoryLabel}</div>
-        <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #1a1a1a; line-height: 1.3;">${title}</h3>
-        <div style="font-size: 13px; color: #666; line-height: 1.6;">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-            <span style="color: ${color};">●</span>
-            ${event.location_name}, ${currentTCities(event.location_city)}
+        const marker = L.marker([event.location_lat, event.location_lng], { icon });
+
+        // Create popup content inline
+        const currentLocale = localeRef.current;
+        const currentTTypes = tTypesRef.current;
+        const currentTCategories = tCategoriesRef.current;
+        const currentTCities = tCitiesRef.current;
+        const currentDateLocale = dateLocaleRef.current;
+
+        const title =
+          currentLocale === 'en' && event.title_en
+            ? event.title_en
+            : currentLocale === 'wo' && event.title_wo
+            ? event.title_wo
+            : event.title;
+
+        const color = getEventColor(event);
+        const categoryLabel = event.category
+          ? currentTCategories(event.category)
+          : currentTTypes(event.event_type);
+
+        const popupContent = `
+          <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
+            <div style="
+              display: inline-block;
+              padding: 4px 10px;
+              font-size: 11px;
+              font-weight: 500;
+              background-color: ${color};
+              color: white;
+              border-radius: 6px;
+              margin-bottom: 10px;
+            ">${categoryLabel}</div>
+            <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #1a1a1a; line-height: 1.3;">${title}</h3>
+            <div style="font-size: 13px; color: #666; line-height: 1.6;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="color: ${color};">●</span>
+                ${event.location_name}, ${currentTCities(event.location_city)}
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="color: ${color};">●</span>
+                ${format(new Date(event.start_date), 'd MMM yyyy, HH:mm', { locale: currentDateLocale })}
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: ${isFreeEvent(event.price) ? '#22c55e' : color};">●</span>
+                <span style="${isFreeEvent(event.price) ? 'color: #22c55e; font-weight: 500;' : ''}">${formatPrice(event.price, currentLocale)}</span>
+              </div>
+            </div>
+            <a href="/${currentLocale}/events/${event.id}" style="
+              display: inline-block;
+              margin-top: 12px;
+              padding: 8px 16px;
+              background-color: #FF6B35;
+              color: white;
+              text-decoration: none;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 500;
+            ">Voir détails →</a>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-            <span style="color: ${color};">●</span>
-            ${format(new Date(event.start_date), 'd MMM yyyy, HH:mm', { locale: currentDateLocale })}
-          </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="color: ${isFreeEvent(event.price) ? '#22c55e' : color};">●</span>
-            <span style="${isFreeEvent(event.price) ? 'color: #22c55e; font-weight: 500;' : ''}">${formatPrice(event.price, currentLocale)}</span>
-          </div>
-        </div>
-        <a href="/${currentLocale}/events/${event.id}" style="
-          display: inline-block;
-          margin-top: 12px;
-          padding: 8px 16px;
-          background-color: #FF6B35;
-          color: white;
-          text-decoration: none;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 500;
-        ">Voir détails →</a>
-      </div>
-    `;
+        `;
+
+        marker.bindPopup(popupContent, {
+          maxWidth: 280,
+          className: 'custom-popup',
+        });
+
+        marker.addTo(globalMarkersLayer);
+
+        // Click handler with stopPropagation to prevent event bubbling
+        marker.on('click', (e: any) => {
+          if (e.originalEvent) {
+            e.originalEvent.stopPropagation();
+          }
+          if (onEventClickRef.current) {
+            onEventClickRef.current(event);
+          }
+        });
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -124,10 +182,15 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
 
     // If we already have a map for this container, reuse it
     if (globalMapInstance && globalMapContainerId === containerId) {
-      // Show loading overlay briefly then hide
+      // Hide loading overlay
       const overlay = containerRef.current.parentElement?.querySelector('.map-loading-overlay');
       if (overlay) {
         overlay.classList.add('hidden');
+      }
+
+      // Still need to add markers when reusing map (fixes initial load issue)
+      if (globalMarkersLayer && leafletRef.current) {
+        addMarkersToMap(eventsRef.current, leafletRef.current);
       }
       return;
     }
@@ -181,6 +244,9 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
       // Create markers layer group
       globalMarkersLayer = leafletRef.current.layerGroup().addTo(map);
 
+      // Add initial markers
+      addMarkersToMap(eventsRef.current, leafletRef.current);
+
       // Hide loading overlay using DOM manipulation (no state change = no re-render)
       const overlay = containerRef.current?.parentElement?.querySelector('.map-loading-overlay');
       if (overlay) {
@@ -195,66 +261,13 @@ export function EventMap({ events, onEventClick }: EventMapProps) {
       // Don't cleanup the map here - it will cause flashing in Strict Mode
       // The map will be cleaned up when a new one is created or on page navigation
     };
-  }, []);
+  }, [addMarkersToMap]);
 
   // Update markers when events change
   useEffect(() => {
     if (!globalMapInstance || !globalMarkersLayer || !leafletRef.current) return;
-
-    // Clear existing markers
-    globalMarkersLayer.clearLayers();
-
-    // Add new markers
-    events.forEach((event) => {
-      if (event.location_lat && event.location_lng) {
-        const markerColor = getEventColor(event);
-        const icon = leafletRef.current.divIcon({
-          className: 'custom-marker',
-          html: `
-            <div style="
-              width: 36px;
-              height: 36px;
-              background-color: ${markerColor};
-              border-radius: 50% 50% 50% 0;
-              transform: rotate(-45deg);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              border: 3px solid white;
-              box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-              cursor: pointer;
-            ">
-              <div style="transform: rotate(45deg); color: white; font-size: 14px; font-weight: bold;">
-                ●
-              </div>
-            </div>
-          `,
-          iconSize: [36, 36],
-          iconAnchor: [18, 36],
-          popupAnchor: [0, -36],
-        });
-
-        const marker = leafletRef.current.marker([event.location_lat, event.location_lng], { icon });
-
-        marker.bindPopup(createPopupContent(event), {
-          maxWidth: 280,
-          className: 'custom-popup',
-        });
-
-        marker.addTo(globalMarkersLayer);
-
-        // Click handler with stopPropagation to prevent event bubbling
-        marker.on('click', (e: any) => {
-          if (e.originalEvent) {
-            e.originalEvent.stopPropagation();
-          }
-          if (onEventClickRef.current) {
-            onEventClickRef.current(event);
-          }
-        });
-      }
-    });
-  }, [events, createPopupContent]);
+    addMarkersToMap(events, leafletRef.current);
+  }, [events, addMarkersToMap]);
 
   // Cleanup only on actual unmount (navigation away)
   useEffect(() => {
